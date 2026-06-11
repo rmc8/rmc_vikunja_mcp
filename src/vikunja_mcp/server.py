@@ -1,0 +1,374 @@
+"""FastMCP server exposing Vikunja task-management operations as MCP tools.
+
+This module wires up :class:`vikunja_mcp.client.VikunjaClient` to the
+Model Context Protocol via :pypi:`mcp`.  Each ``@mcp.tool()``-decorated
+function maps one-to-one to a Vikunja API operation, providing LLM
+assistants with full CRUD access to projects, tasks, labels, comments
+and user assignments.
+
+Environment variables:
+    VIKUNJA_URL   - Base URL of the Vikunja instance.
+    VIKUNJA_TOKEN - API bearer token.
+"""
+
+import os
+
+from dotenv import load_dotenv
+from mcp.server.fastmcp import FastMCP
+
+from vikunja_mcp.client import VikunjaClient
+from vikunja_mcp.models import Comment, Label, Project, Task, User
+
+# Load environment variables from a .env file when present.
+load_dotenv()
+
+# Initialise the FastMCP server instance.
+mcp = FastMCP("vikunja")
+
+
+def get_client() -> VikunjaClient:
+    """Build a :class:`VikunjaClient` from environment variables.
+
+    Returns:
+        A ready-to-use client instance (use as an async context manager).
+
+    Raises:
+        ValueError: If ``VIKUNJA_URL`` or ``VIKUNJA_TOKEN`` is missing.
+    """
+    base_url = os.getenv("VIKUNJA_URL")
+    token = os.getenv("VIKUNJA_TOKEN")
+
+    if not base_url or not token:
+        raise ValueError(
+            "VIKUNJA_URL and VIKUNJA_TOKEN environment variables must be set. "
+            "Please configure them in your .env file."
+        )
+    return VikunjaClient(base_url, token)
+
+
+# ---------------------------------------------------------------------------
+# User tools
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+async def get_user_info() -> User:
+    """Get the authenticated user's profile from Vikunja.
+
+    Useful for checking connectivity and verifying the API token.
+    """
+    async with get_client() as client:
+        return await client.get_user_info()
+
+
+@mcp.tool()
+async def search_users(query: str) -> list[User]:
+    """Search for users in Vikunja by username or email.
+
+    Args:
+        query: The search term (username or email fragment).
+    """
+    async with get_client() as client:
+        return await client.search_users(query)
+
+
+# ---------------------------------------------------------------------------
+# Project tools
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+async def list_projects() -> list[Project]:
+    """List all projects visible to the authenticated user."""
+    async with get_client() as client:
+        return await client.list_projects()
+
+
+@mcp.tool()
+async def create_project(
+    title: str, description: str | None = None
+) -> Project:
+    """Create a new project.
+
+    Args:
+        title: The title of the project.
+        description: Optional project description.
+    """
+    async with get_client() as client:
+        return await client.create_project(title, description)
+
+
+@mcp.tool()
+async def get_project(project_id: int) -> Project:
+    """Get project details by project ID.
+
+    Args:
+        project_id: The ID of the project.
+    """
+    async with get_client() as client:
+        return await client.get_project(project_id)
+
+
+@mcp.tool()
+async def delete_project(project_id: int) -> str:
+    """Delete a project and all of its tasks.
+
+    Args:
+        project_id: The ID of the project to delete.
+    """
+    async with get_client() as client:
+        await client.delete_project(project_id)
+        return f"Project '{project_id}' successfully deleted."
+
+
+# ---------------------------------------------------------------------------
+# Task tools
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+async def get_task(task_id: int) -> Task:
+    """Get task details by task ID.
+
+    Args:
+        task_id: The ID of the task.
+    """
+    async with get_client() as client:
+        return await client.get_task(task_id)
+
+
+@mcp.tool()
+async def list_tasks(project_id: int) -> list[Task]:
+    """List all tasks within a specific project.
+
+    Args:
+        project_id: The ID of the project whose tasks to list.
+    """
+    async with get_client() as client:
+        return await client.list_tasks(project_id)
+
+
+@mcp.tool()
+async def list_tasks_global(
+    search: str | None = None, done: bool | None = None
+) -> list[Task]:
+    """List tasks across all projects with optional filters.
+
+    Both *search* and *done* may be provided simultaneously.
+
+    Args:
+        search: Optional free-text search term.
+        done: Optional completion-status filter.
+    """
+    async with get_client() as client:
+        return await client.list_tasks_global(search, done)
+
+
+@mcp.tool()
+async def create_task(
+    project_id: int,
+    title: str,
+    description: str | None = None,
+    due_date: str | None = None,
+    priority: int | None = None,
+) -> Task:
+    """Create a new task under a specific project.
+
+    Args:
+        project_id: The ID of the parent project.
+        title: The task title / summary.
+        description: Optional detailed description.
+        due_date: Optional due date in ISO-8601 format.
+        priority: Optional priority (higher = more urgent).
+    """
+    async with get_client() as client:
+        return await client.create_task(
+            project_id=project_id,
+            title=title,
+            description=description,
+            due_date=due_date,
+            priority=priority,
+        )
+
+
+@mcp.tool()
+async def update_task(
+    task_id: int,
+    title: str | None = None,
+    description: str | None = None,
+    done: bool | None = None,
+    project_id: int | None = None,
+    due_date: str | None = None,
+    priority: int | None = None,
+) -> Task:
+    """Update fields of an existing task (safe Read-Modify-Write).
+
+    Only the fields you provide will be changed; all others are preserved.
+    Setting *project_id* moves the task to a different project.
+
+    Args:
+        task_id: The ID of the task to update.
+        title: New title (omit to keep current).
+        description: New description.
+        done: New completion status.
+        project_id: New parent project ID (moves the task).
+        due_date: New due date in ISO-8601 format.
+        priority: New priority level.
+    """
+    async with get_client() as client:
+        return await client.update_task(
+            task_id=task_id,
+            title=title,
+            description=description,
+            done=done,
+            project_id=project_id,
+            due_date=due_date,
+            priority=priority,
+        )
+
+
+@mcp.tool()
+async def delete_task(task_id: int) -> str:
+    """Permanently delete a task.
+
+    Args:
+        task_id: The ID of the task to delete.
+    """
+    async with get_client() as client:
+        await client.delete_task(task_id)
+        return f"Task '{task_id}' successfully deleted."
+
+
+# ---------------------------------------------------------------------------
+# Label tools
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+async def list_labels() -> list[Label]:
+    """List all labels owned by the authenticated user."""
+    async with get_client() as client:
+        return await client.list_labels()
+
+
+@mcp.tool()
+async def create_label(
+    title: str, color: str | None = None
+) -> Label:
+    """Create a new label.
+
+    Args:
+        title: The label name.
+        color: Optional HEX colour string (e.g. '#ff0000').
+    """
+    async with get_client() as client:
+        return await client.create_label(title, color)
+
+
+@mcp.tool()
+async def add_label_to_task(task_id: int, label_id: int) -> str:
+    """Attach a label to a task.
+
+    Args:
+        task_id: The ID of the task.
+        label_id: The ID of the label to attach.
+    """
+    async with get_client() as client:
+        await client.add_label_to_task(task_id, label_id)
+        return (
+            f"Label '{label_id}' successfully added to task '{task_id}'."
+        )
+
+
+@mcp.tool()
+async def remove_label_from_task(
+    task_id: int, label_id: int
+) -> str:
+    """Remove a label from a task.
+
+    Args:
+        task_id: The ID of the task.
+        label_id: The ID of the label to detach.
+    """
+    async with get_client() as client:
+        await client.remove_label_from_task(task_id, label_id)
+        return (
+            f"Label '{label_id}' successfully removed "
+            f"from task '{task_id}'."
+        )
+
+
+# ---------------------------------------------------------------------------
+# Assignee tools
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+async def assign_user_to_task(task_id: int, user_id: int) -> str:
+    """Assign a user to a task.
+
+    Args:
+        task_id: The ID of the task.
+        user_id: The ID of the user to assign.
+    """
+    async with get_client() as client:
+        await client.assign_user_to_task(task_id, user_id)
+        return (
+            f"User '{user_id}' successfully assigned "
+            f"to task '{task_id}'."
+        )
+
+
+@mcp.tool()
+async def unassign_user_from_task(
+    task_id: int, user_id: int
+) -> str:
+    """Remove a user's assignment from a task.
+
+    Args:
+        task_id: The ID of the task.
+        user_id: The ID of the user to unassign.
+    """
+    async with get_client() as client:
+        await client.unassign_user_from_task(task_id, user_id)
+        return (
+            f"User '{user_id}' successfully unassigned "
+            f"from task '{task_id}'."
+        )
+
+
+# ---------------------------------------------------------------------------
+# Comment tools
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+async def list_task_comments(task_id: int) -> list[Comment]:
+    """List all comments on a specific task.
+
+    Args:
+        task_id: The ID of the task.
+    """
+    async with get_client() as client:
+        return await client.list_task_comments(task_id)
+
+
+@mcp.tool()
+async def add_comment_to_task(
+    task_id: int, comment: str
+) -> Comment:
+    """Add a comment to a specific task.
+
+    Args:
+        task_id: The ID of the task.
+        comment: The comment body text.
+    """
+    async with get_client() as client:
+        return await client.add_comment_to_task(task_id, comment)
+
+
+# ---------------------------------------------------------------------------
+# CLI entry-point
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    """Entry-point for the ``vikunja-mcp`` CLI command."""
+    mcp.run()
+
+
+if __name__ == "__main__":
+    main()
