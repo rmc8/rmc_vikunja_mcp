@@ -17,8 +17,6 @@ import httpx
 from vikunja_mcp.models import Comment, Label, Project, Task, User
 
 
-
-
 class VikunjaClient:
     """Async client for the Vikunja REST API.
 

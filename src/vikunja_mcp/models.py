@@ -81,7 +81,7 @@ class Task(BaseModel):
     priority: int | None = Field(
         default=None, description="Priority level (higher = more urgent)."
     )
-    labels: list["Label"] | None = Field(
+    labels: list[Label] | None = Field(
         default=None,
         description="Labels currently attached to this task.",
     )

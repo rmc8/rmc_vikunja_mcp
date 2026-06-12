@@ -171,10 +171,14 @@ async def create_task(
 ) -> Task:
     """Create a new task under a specific project.
 
+    The task description field MUST be raw HTML (WYSIWYG format), e.g. using <p>, <br>,
+    <h3>, <ul>, <li>. Do NOT use Markdown in the description field.
+
     Args:
         project_id: The ID of the parent project.
         title: The task title / summary.
         description: Optional detailed description.
+            MUST be HTML; Markdown is not allowed.
         due_date: Optional due date in ISO-8601 format.
         priority: Optional priority (higher = more urgent).
     """
@@ -203,10 +207,14 @@ async def update_task(
     Only the fields you provide will be changed; all others are preserved.
     Setting *project_id* moves the task to a different project.
 
+    The task description field MUST be raw HTML (WYSIWYG format), e.g. using <p>, <br>,
+    <h3>, <ul>, <li>. Do NOT use Markdown in the description field.
+
     Args:
         task_id: The ID of the task to update.
         title: New title (omit to keep current).
         description: New description.
+            MUST be HTML; Markdown is not allowed.
         done: New completion status.
         project_id: New parent project ID (moves the task).
         due_date: New due date in ISO-8601 format.
