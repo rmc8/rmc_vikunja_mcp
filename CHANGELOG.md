@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-06-12
+
+### Fixed
+
+- **Pydantic Validation & Model Alignment**
+  - **Task**: Changed `labels` field type from `list["Label"] | None` to `list["Label"]` as the Vikunja API returns an empty list `[]` instead of `null` for empty slices.
+  - **Label**: Removed redundant `alias="hex_color"` on the `hex_color` field to avoid Pydantic population issues.
+  - **Label**: Added missing `created_by` field (typed as `User | None`) which is returned by the Vikunja API.
+  - **Comment**: Marked `author` field as optional (`User | None`) to gracefully handle cases where the API doesn't return the author.
+- **Tests**
+  - Fixed an assertion bug in `test_update_task_read_modify_write` where an unexpected ID was being checked.
+  - Fixed argument name and format in `test_create_label` (`hex_color` without leading `#` instead of `color`).
+
 ## [0.2.0] - 2026-06-12
 
 ### Added

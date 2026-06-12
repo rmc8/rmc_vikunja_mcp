@@ -391,7 +391,6 @@ class TestClientUpdateTaskRMW:
 
         # 2. Verify the payload merges and strips created/updated.
         expected_body: dict[str, Any] = {
-            "id": 101,
             "title": "New Title",
             "description": "Old Desc",
             "done": True,
@@ -446,10 +445,10 @@ class TestLabelTools:
             Label.model_validate(mock_data)
         )
 
-        label = await create_label(title="Label 1", color="#ff0000")
+        label = await create_label(title="Label 1", hex_color="ff0000")
 
         mock_client_ctx.create_label.assert_called_once_with(
-            "Label 1", "#ff0000"
+            "Label 1", "ff0000"
         )
         assert label.id == 1
 

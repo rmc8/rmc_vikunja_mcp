@@ -105,8 +105,10 @@ class Label(BaseModel):
         default=None, description="Optional label description."
     )
     hex_color: str | None = Field(
-        default=None, description="HEX colour string, e.g. 'ff0000' (no #).",
-        alias="hex_color",
+        default=None, description="HEX colour string, e.g. 'ff0000' (no #)."
+    )
+    created_by: User | None = Field(
+        default=None, description="User who created this label."
     )
     created: str | None = Field(
         default=None, description="ISO-8601 creation timestamp."
@@ -126,7 +128,9 @@ class Comment(BaseModel):
 
     id: int = Field(..., description="Unique comment identifier.")
     comment: str = Field(..., description="Comment body text.")
-    author: User = Field(..., description="User who wrote the comment.")
+    author: User | None = Field(
+        default=None, description="User who wrote the comment."
+    )
     created: str | None = Field(
         default=None, description="ISO-8601 creation timestamp."
     )
