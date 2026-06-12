@@ -5,4 +5,4 @@ Vikunja REST API, enabling programmatic management of projects, tasks, labels,
 comments, and user assignments.
 """
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
