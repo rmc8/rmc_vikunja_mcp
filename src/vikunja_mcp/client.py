@@ -469,3 +469,39 @@ class VikunjaClient:
             "PUT", f"tasks/{task_id}/comments", json=body
         )
         return Comment.model_validate(data)
+
+    # -- Task Relation endpoints -----------------------------------------
+
+    async def add_task_relation(
+        self, task_id: int, other_task_id: int, relation_kind: str
+    ) -> None:
+        """Create a relation between *task_id* and *other_task_id*.
+
+        Args:
+            task_id:         ID of the base task.
+            other_task_id:   ID of the target task.
+            relation_kind:   The kind of relation (e.g., 'subtask', 'blocking').
+        """
+        body = {
+            "other_task_id": other_task_id,
+            "relation_kind": relation_kind,
+        }
+        await self._request(
+            "PUT", f"tasks/{task_id}/relations", json=body
+        )
+
+    async def remove_task_relation(
+        self, task_id: int, other_task_id: int, relation_kind: str
+    ) -> None:
+        """Remove a relation between *task_id* and *other_task_id*.
+
+        Args:
+            task_id:         ID of the base task.
+            other_task_id:   ID of the target task.
+            relation_kind:   The kind of relation to remove.
+        """
+        await self._request(
+            "DELETE",
+            f"tasks/{task_id}/relations/{relation_kind}/{other_task_id}",
+        )
+

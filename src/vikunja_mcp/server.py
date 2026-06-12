@@ -407,6 +407,47 @@ async def add_comment_to_task(
         return await client.add_comment_to_task(task_id, comment)
 
 
+@mcp.tool()
+async def add_task_relation(
+    task_id: int, other_task_id: int, relation_kind: str = "subtask"
+) -> str:
+    """Create a relation (e.g., subtask, blocking) between two tasks.
+
+    Args:
+        task_id: The ID of the base task.
+        other_task_id: The ID of the target task.
+        relation_kind: The relationship type. Defaults to 'subtask'.
+            Allowed values: 'subtask', 'parenttask', 'related', 'blocking',
+            'blockedby', 'duplicateof', 'duplicates', 'precedes', 'follows',
+            'copiedfrom', 'copiedto'.
+    """
+    async with get_client() as client:
+        await client.add_task_relation(task_id, other_task_id, relation_kind)
+        return (
+            f"Successfully created relation '{relation_kind}' from task "
+            f"'{task_id}' to task '{other_task_id}'."
+        )
+
+
+@mcp.tool()
+async def remove_task_relation(
+    task_id: int, other_task_id: int, relation_kind: str = "subtask"
+) -> str:
+    """Remove a relation between two tasks.
+
+    Args:
+        task_id: The ID of the base task.
+        other_task_id: The ID of the target task.
+        relation_kind: The relationship type to remove. Defaults to 'subtask'.
+    """
+    async with get_client() as client:
+        await client.remove_task_relation(task_id, other_task_id, relation_kind)
+        return (
+            f"Successfully removed relation '{relation_kind}' between "
+            f"task '{task_id}' and task '{other_task_id}'."
+        )
+
+
 # ---------------------------------------------------------------------------
 # CLI entry-point
 # ---------------------------------------------------------------------------
@@ -414,6 +455,7 @@ async def add_comment_to_task(
 def main() -> None:
     """Entry-point for the ``vikunja-mcp`` CLI command."""
     mcp.run()
+
 
 
 if __name__ == "__main__":

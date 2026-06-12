@@ -17,6 +17,7 @@ from vikunja_mcp.models import Comment, Label, Project, Task, User
 from vikunja_mcp.server import (
     add_comment_to_task,
     add_label_to_task,
+    add_task_relation,
     assign_user_to_task,
     create_label,
     create_project,
@@ -33,6 +34,7 @@ from vikunja_mcp.server import (
     list_tasks,
     list_tasks_global,
     remove_label_from_task,
+    remove_task_relation,
     search_users,
     unassign_user_from_task,
     update_task,
@@ -597,3 +599,40 @@ class TestCommentTools:
         )
         assert comment.id == 6
         assert comment.comment == "Adding a comment"
+
+
+# ---------------------------------------------------------------------------
+# Task Relation tool tests
+# ---------------------------------------------------------------------------
+
+class TestTaskRelationTools:
+    """Tests for task-relation MCP tools."""
+
+    @pytest.mark.asyncio
+    async def test_add_task_relation(
+        self, mock_client_ctx: AsyncMock
+    ) -> None:
+        """``add_task_relation`` creates a relation and returns confirmation."""
+        result = await add_task_relation(
+            task_id=1, other_task_id=2, relation_kind="subtask"
+        )
+
+        mock_client_ctx.add_task_relation.assert_called_once_with(
+            1, 2, "subtask"
+        )
+        assert "Successfully created relation 'subtask'" in result
+
+    @pytest.mark.asyncio
+    async def test_remove_task_relation(
+        self, mock_client_ctx: AsyncMock
+    ) -> None:
+        """``remove_task_relation`` removes a relation and returns confirmation."""
+        result = await remove_task_relation(
+            task_id=1, other_task_id=2, relation_kind="subtask"
+        )
+
+        mock_client_ctx.remove_task_relation.assert_called_once_with(
+            1, 2, "subtask"
+        )
+        assert "Successfully removed relation 'subtask'" in result
+
