@@ -6,6 +6,8 @@ fields returned by future API versions are silently discarded rather than
 causing validation errors.
 """
 
+from __future__ import annotations
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -137,3 +139,11 @@ class Comment(BaseModel):
     updated: str | None = Field(
         default=None, description="ISO-8601 last-update timestamp."
     )
+
+
+# ------------------------------------------------------------------
+# Resolve forward references (Task -> Label) so that Pydantic can
+# correctly validate union types like ``list[Label] | None``.
+# ------------------------------------------------------------------
+Task.model_rebuild()
+Label.model_rebuild()

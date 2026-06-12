@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2026-06-12
+
+### Fixed
+
+- **Pydantic Forward Reference Resolution (Root cause fix)**
+  - Added `from __future__ import annotations` to `models.py` to enable deferred evaluation of type annotations.
+  - Added `Task.model_rebuild()` and `Label.model_rebuild()` at module level so that Pydantic correctly resolves forward references (`Task.labels: list[Label] | None` where `Label` is defined after `Task`).
+  - This was the true root cause of the `Input should be a valid list` validation error when the Vikunja API returned `labels: null` — the `| None` part of the union was not being recognized due to unresolved forward references.
+- **Tests**
+  - Added `test_list_tasks_with_null_labels` regression test to explicitly cover the `labels: null` scenario.
+
 ## [0.2.2] - 2026-06-12
 
 ### Fixed

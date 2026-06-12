@@ -242,6 +242,29 @@ class TestTaskTools:
         assert tasks[0].id == 10
 
     @pytest.mark.asyncio
+    async def test_list_tasks_with_null_labels(
+        self, mock_client_ctx: AsyncMock
+    ) -> None:
+        """``list_tasks`` handles tasks where the API returns ``labels: null``."""
+        mock_data = [
+            {
+                "id": 11,
+                "title": "Task with null labels",
+                "project_id": 1,
+                "labels": None,
+            }
+        ]
+        mock_client_ctx.list_tasks.return_value = [
+            Task.model_validate(t) for t in mock_data
+        ]
+
+        tasks = await list_tasks(project_id=1)
+
+        assert len(tasks) == 1
+        assert tasks[0].id == 11
+        assert tasks[0].labels is None
+
+    @pytest.mark.asyncio
     async def test_list_tasks_global(
         self, mock_client_ctx: AsyncMock
     ) -> None:
