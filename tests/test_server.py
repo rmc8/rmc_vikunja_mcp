@@ -14,40 +14,45 @@ import pytest
 
 from vikunja_mcp.client import VikunjaClient
 from vikunja_mcp.models import Bucket, Comment, Label, Project, SavedFilter, Task, User
-from vikunja_mcp.server import (
-    add_comment_to_task,
+from vikunja_mcp.server import get_client
+from vikunja_mcp.tools.filters import (
+    create_filter,
+    delete_filter,
+    get_filter,
+    list_filters,
+    update_filter,
+)
+from vikunja_mcp.tools.labels import (
     add_label_to_task,
+    create_label,
+    list_labels,
+    remove_label_from_task,
+)
+from vikunja_mcp.tools.projects import (
+    create_bucket,
+    create_project,
+    delete_bucket,
+    delete_project,
+    get_project,
+    list_buckets,
+    list_projects,
+    update_bucket,
+)
+from vikunja_mcp.tools.tasks import (
+    add_comment_to_task,
     add_task_relation,
     assign_user_to_task,
-    create_bucket,
-    create_filter,
-    create_label,
-    create_project,
     create_task,
-    delete_bucket,
-    delete_filter,
-    delete_project,
     delete_task,
-    get_client,
-    get_filter,
-    get_project,
     get_task,
-    get_user_info,
-    list_buckets,
-    list_filters,
-    list_labels,
-    list_projects,
     list_task_comments,
     list_tasks,
     list_tasks_global,
-    remove_label_from_task,
     remove_task_relation,
-    search_users,
     unassign_user_from_task,
-    update_bucket,
-    update_filter,
     update_task,
 )
+from vikunja_mcp.tools.users import get_user_info, search_users
 
 # ---------------------------------------------------------------------------
 # Fixtures

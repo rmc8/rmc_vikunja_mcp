@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-06-13
+
+### Added
+
+- **Kanban Buckets**: Added tools `list_buckets`, `create_bucket`, `update_bucket`, and `delete_bucket` to manage Kanban board lanes.
+- **Saved Filters**: Added tools `list_filters`, `get_filter`, `create_filter`, `update_filter`, and `delete_filter` to manage saved filters (virtual projects).
+
+### Refactored
+
+- **Code Organization**: Split the single `client.py` and `server.py` files into modular directory structures under `vikunja_mcp/client/` and `vikunja_mcp/tools/` for better maintainability and code readability.
+
 ## [0.3.0] - 2026-06-12
 
 ### Added
