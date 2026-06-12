@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
 from vikunja_mcp.client import VikunjaClient
-from vikunja_mcp.models import Comment, Label, Project, Task, User
+from vikunja_mcp.models import Bucket, Comment, Label, Project, SavedFilter, Task, User
 
 # Load environment variables from a .env file when present.
 load_dotenv()
@@ -449,6 +449,189 @@ async def remove_task_relation(
 
 
 # ---------------------------------------------------------------------------
+# Bucket tools
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+async def list_buckets(project_id: int, view_id: int) -> list[Bucket]:
+    """List all Kanban buckets (lanes) within a specific project view.
+
+    Args:
+        project_id: The ID of the project.
+        view_id: The ID of the Kanban view.
+    """
+    async with get_client() as client:
+        return await client.list_buckets(project_id, view_id)
+
+
+@mcp.tool()
+async def create_bucket(
+    project_id: int,
+    view_id: int,
+    title: str,
+    limit: int | None = None,
+    position: float | None = None,
+) -> Bucket:
+    """Create a new Kanban bucket (lane) in a project view.
+
+    Args:
+        project_id: The ID of the parent project.
+        view_id: The ID of the Kanban view.
+        title: The title of the bucket.
+        limit: Optional Work In Progress (WIP) limit.
+        position: Optional position of the bucket in the view.
+    """
+    async with get_client() as client:
+        return await client.create_bucket(
+            project_id=project_id,
+            view_id=view_id,
+            title=title,
+            limit=limit,
+            position=position,
+        )
+
+
+@mcp.tool()
+async def update_bucket(
+    project_id: int,
+    view_id: int,
+    bucket_id: int,
+    title: str | None = None,
+    limit: int | None = None,
+) -> Bucket:
+    """Update properties of an existing Kanban bucket (lane).
+
+    Args:
+        project_id: The ID of the parent project.
+        view_id: The ID of the Kanban view.
+        bucket_id: The ID of the bucket to update.
+        title: Optional new title.
+        limit: Optional new WIP limit.
+    """
+    async with get_client() as client:
+        return await client.update_bucket(
+            project_id=project_id,
+            view_id=view_id,
+            bucket_id=bucket_id,
+            title=title,
+            limit=limit,
+        )
+
+
+@mcp.tool()
+async def delete_bucket(
+    project_id: int, view_id: int, bucket_id: int
+) -> str:
+    """Permanently delete a Kanban bucket (lane).
+
+    Args:
+        project_id: The ID of the parent project.
+        view_id: The ID of the Kanban view.
+        bucket_id: The ID of the bucket to delete.
+    """
+    async with get_client() as client:
+        await client.delete_bucket(project_id, view_id, bucket_id)
+        return f"Bucket '{bucket_id}' successfully deleted."
+
+
+# ---------------------------------------------------------------------------
+# Filter tools
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+async def list_filters() -> list[SavedFilter]:
+    """List all saved filters (virtual projects)."""
+    async with get_client() as client:
+        return await client.list_filters()
+
+
+@mcp.tool()
+async def get_filter(filter_id: int) -> SavedFilter:
+    """Get details of a single saved filter.
+
+    Args:
+        filter_id: The ID of the saved filter.
+    """
+    async with get_client() as client:
+        return await client.get_filter(filter_id)
+
+
+@mcp.tool()
+async def create_filter(
+    title: str,
+    filter_query: str,
+    description: str | None = None,
+    is_favorite: bool | None = None,
+    sort_by: list[str] | None = None,
+    order_by: list[str] | None = None,
+) -> SavedFilter:
+    """Create a new saved filter (virtual project).
+
+    Args:
+        title: The title of the saved filter.
+        filter_query: The filter query string using Vikunja filter DSL.
+        description: Optional description of the filter.
+        is_favorite: Whether to mark this filter as a favorite.
+        sort_by: Optional list of fields to sort by.
+        order_by: Optional list of sorting order corresponding to sort_by (asc/desc).
+    """
+    async with get_client() as client:
+        return await client.create_filter(
+            title=title,
+            filter_query=filter_query,
+            description=description,
+            is_favorite=is_favorite,
+            sort_by=sort_by,
+            order_by=order_by,
+        )
+
+
+@mcp.tool()
+async def update_filter(
+    filter_id: int,
+    title: str | None = None,
+    filter_query: str | None = None,
+    description: str | None = None,
+    is_favorite: bool | None = None,
+    sort_by: list[str] | None = None,
+    order_by: list[str] | None = None,
+) -> SavedFilter:
+    """Update properties of an existing saved filter.
+
+    Args:
+        filter_id: The ID of the saved filter to update.
+        title: Optional new title.
+        filter_query: Optional new filter query string using Vikunja filter DSL.
+        description: Optional new description.
+        is_favorite: Optional new favorite status.
+        sort_by: Optional new list of fields to sort by.
+        order_by: Optional new list of sorting order (asc/desc).
+    """
+    async with get_client() as client:
+        return await client.update_filter(
+            filter_id=filter_id,
+            title=title,
+            filter_query=filter_query,
+            description=description,
+            is_favorite=is_favorite,
+            sort_by=sort_by,
+            order_by=order_by,
+        )
+
+
+@mcp.tool()
+async def delete_filter(filter_id: int) -> str:
+    """Permanently delete a saved filter.
+
+    Args:
+        filter_id: The ID of the saved filter to delete.
+    """
+    async with get_client() as client:
+        await client.delete_filter(filter_id)
+        return f"Saved filter '{filter_id}' successfully deleted."
+
+
+# ---------------------------------------------------------------------------
 # CLI entry-point
 # ---------------------------------------------------------------------------
 
@@ -460,3 +643,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

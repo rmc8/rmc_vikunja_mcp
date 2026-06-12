@@ -140,6 +140,71 @@ class Comment(BaseModel):
         default=None, description="ISO-8601 last-update timestamp."
     )
 
+class Bucket(BaseModel):
+    """A Kanban bucket (lane) within a project view."""
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        extra="ignore",
+    )
+
+    id: int = Field(..., description="Unique bucket identifier.")
+    title: str = Field(..., description="Bucket title.")
+    project_view_id: int = Field(
+        ..., description="ID of the project view this bucket belongs to."
+    )
+    limit: int | None = Field(
+        default=0, description="Work In Progress (WIP) limit."
+    )
+    position: float | None = Field(
+        default=None, description="Position of the bucket."
+    )
+    created: str | None = Field(
+        default=None, description="ISO-8601 creation timestamp."
+    )
+    updated: str | None = Field(
+        default=None, description="ISO-8601 last-update timestamp."
+    )
+
+class FilterConfig(BaseModel):
+    """Configuration details for a saved filter query."""
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        extra="ignore",
+    )
+
+    filter: str = Field(..., description="The filter query string (DSL).")
+    sort_by: list[str] | None = Field(
+        default=None, alias="sort_by", description="Fields to sort by."
+    )
+    order_by: list[str] | None = Field(
+        default=None, alias="order_by", description="Order of sorting (asc/desc)."
+    )
+
+
+class SavedFilter(BaseModel):
+    """A saved filter (virtual project) in Vikunja."""
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        extra="ignore",
+    )
+
+    id: int = Field(..., description="Unique filter identifier.")
+    title: str = Field(..., description="Title of the saved filter.")
+    description: str | None = Field(default=None, description="Optional description.")
+    is_favorite: bool | None = Field(
+        default=False, description="Whether the filter is marked as favorite."
+    )
+    filters: FilterConfig = Field(..., description="Filter query configuration.")
+    created: str | None = Field(
+        default=None, description="ISO-8601 creation timestamp."
+    )
+    updated: str | None = Field(
+        default=None, description="ISO-8601 last-update timestamp."
+    )
+
 
 # ------------------------------------------------------------------
 # Resolve forward references (Task -> Label) so that Pydantic can
@@ -147,3 +212,7 @@ class Comment(BaseModel):
 # ------------------------------------------------------------------
 Task.model_rebuild()
 Label.model_rebuild()
+Bucket.model_rebuild()
+FilterConfig.model_rebuild()
+SavedFilter.model_rebuild()
+

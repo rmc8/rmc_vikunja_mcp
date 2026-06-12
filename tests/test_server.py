@@ -13,21 +13,28 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from vikunja_mcp.client import VikunjaClient
-from vikunja_mcp.models import Comment, Label, Project, Task, User
+from vikunja_mcp.models import Bucket, Comment, Label, Project, SavedFilter, Task, User
 from vikunja_mcp.server import (
     add_comment_to_task,
     add_label_to_task,
     add_task_relation,
     assign_user_to_task,
+    create_bucket,
+    create_filter,
     create_label,
     create_project,
     create_task,
+    delete_bucket,
+    delete_filter,
     delete_project,
     delete_task,
     get_client,
+    get_filter,
     get_project,
     get_task,
     get_user_info,
+    list_buckets,
+    list_filters,
     list_labels,
     list_projects,
     list_task_comments,
@@ -37,6 +44,8 @@ from vikunja_mcp.server import (
     remove_task_relation,
     search_users,
     unassign_user_from_task,
+    update_bucket,
+    update_filter,
     update_task,
 )
 
@@ -635,4 +644,258 @@ class TestTaskRelationTools:
             1, 2, "subtask"
         )
         assert "Successfully removed relation 'subtask'" in result
+
+
+# ---------------------------------------------------------------------------
+# Bucket tool tests
+# ---------------------------------------------------------------------------
+
+class TestBucketTools:
+    """Tests for Kanban bucket CRUD MCP tools."""
+
+    @pytest.mark.asyncio
+    async def test_list_buckets(
+        self, mock_client_ctx: AsyncMock
+    ) -> None:
+        """``list_buckets`` returns buckets for a project view."""
+        mock_data = [
+            {
+                "id": 1,
+                "title": "Todo",
+                "project_view_id": 2,
+                "limit": 0,
+                "position": 1.0,
+            },
+            {
+                "id": 2,
+                "title": "Done",
+                "project_view_id": 2,
+                "limit": 5,
+                "position": 2.0,
+            },
+        ]
+        mock_client_ctx.list_buckets.return_value = [
+            Bucket.model_validate(b) for b in mock_data
+        ]
+
+        buckets = await list_buckets(project_id=10, view_id=2)
+
+        mock_client_ctx.list_buckets.assert_called_once_with(10, 2)
+        assert len(buckets) == 2
+        assert buckets[0].title == "Todo"
+        assert buckets[1].limit == 5
+
+    @pytest.mark.asyncio
+    async def test_create_bucket(
+        self, mock_client_ctx: AsyncMock
+    ) -> None:
+        """``create_bucket`` forwards all fields and returns the bucket."""
+        mock_data = {
+            "id": 3,
+            "title": "In Progress",
+            "project_view_id": 2,
+            "limit": 3,
+            "position": 1.5,
+        }
+        mock_client_ctx.create_bucket.return_value = (
+            Bucket.model_validate(mock_data)
+        )
+
+        bucket = await create_bucket(
+            project_id=10,
+            view_id=2,
+            title="In Progress",
+            limit=3,
+            position=1.5,
+        )
+
+        mock_client_ctx.create_bucket.assert_called_once_with(
+            project_id=10,
+            view_id=2,
+            title="In Progress",
+            limit=3,
+            position=1.5,
+        )
+        assert bucket.id == 3
+        assert bucket.title == "In Progress"
+        assert bucket.limit == 3
+
+    @pytest.mark.asyncio
+    async def test_update_bucket(
+        self, mock_client_ctx: AsyncMock
+    ) -> None:
+        """``update_bucket`` passes updates to client and returns updated bucket."""
+        mock_data = {
+            "id": 3,
+            "title": "Updated Title",
+            "project_view_id": 2,
+            "limit": 10,
+            "position": 1.5,
+        }
+        mock_client_ctx.update_bucket.return_value = (
+            Bucket.model_validate(mock_data)
+        )
+
+        bucket = await update_bucket(
+            project_id=10,
+            view_id=2,
+            bucket_id=3,
+            title="Updated Title",
+            limit=10,
+        )
+
+        mock_client_ctx.update_bucket.assert_called_once_with(
+            project_id=10,
+            view_id=2,
+            bucket_id=3,
+            title="Updated Title",
+            limit=10,
+        )
+        assert bucket.title == "Updated Title"
+        assert bucket.limit == 10
+
+    @pytest.mark.asyncio
+    async def test_delete_bucket(
+        self, mock_client_ctx: AsyncMock
+    ) -> None:
+        """``delete_bucket`` deletes the bucket and returns confirmation."""
+        result = await delete_bucket(project_id=10, view_id=2, bucket_id=3)
+
+        mock_client_ctx.delete_bucket.assert_called_once_with(10, 2, 3)
+        assert "Bucket '3' successfully deleted." in result
+
+
+# ---------------------------------------------------------------------------
+# Filter tool tests
+# ---------------------------------------------------------------------------
+
+class TestFilterTools:
+    """Tests for Saved Filter CRUD MCP tools."""
+
+    @pytest.mark.asyncio
+    async def test_list_filters(
+        self, mock_client_ctx: AsyncMock
+    ) -> None:
+        """``list_filters`` returns all saved filters."""
+        mock_data = [
+            {
+                "id": 1,
+                "title": "High Priority",
+                "filters": {
+                    "filter": "priority >= 4",
+                    "sort_by": ["due_date"],
+                    "order_by": ["asc"],
+                },
+            }
+        ]
+        mock_client_ctx.list_filters.return_value = [
+            SavedFilter.model_validate(f) for f in mock_data
+        ]
+
+        filters = await list_filters()
+
+        mock_client_ctx.list_filters.assert_called_once()
+        assert len(filters) == 1
+        assert filters[0].title == "High Priority"
+        assert filters[0].filters.filter == "priority >= 4"
+
+    @pytest.mark.asyncio
+    async def test_get_filter(
+        self, mock_client_ctx: AsyncMock
+    ) -> None:
+        """``get_filter`` returns a single saved filter by ID."""
+        mock_data = {
+            "id": 1,
+            "title": "High Priority",
+            "filters": {"filter": "priority >= 4"},
+        }
+        mock_client_ctx.get_filter.return_value = (
+            SavedFilter.model_validate(mock_data)
+        )
+
+        f = await get_filter(filter_id=1)
+
+        mock_client_ctx.get_filter.assert_called_once_with(1)
+        assert f.id == 1
+        assert f.title == "High Priority"
+
+    @pytest.mark.asyncio
+    async def test_create_filter(
+        self, mock_client_ctx: AsyncMock
+    ) -> None:
+        """``create_filter`` forwards parameters and returns the created filter."""
+        mock_data = {
+            "id": 2,
+            "title": "New Filter",
+            "description": "Desc",
+            "is_favorite": True,
+            "filters": {
+                "filter": "done = false",
+                "sort_by": ["created"],
+                "order_by": ["desc"],
+            },
+        }
+        mock_client_ctx.create_filter.return_value = (
+            SavedFilter.model_validate(mock_data)
+        )
+
+        f = await create_filter(
+            title="New Filter",
+            filter_query="done = false",
+            description="Desc",
+            is_favorite=True,
+            sort_by=["created"],
+            order_by=["desc"],
+        )
+
+        mock_client_ctx.create_filter.assert_called_once_with(
+            title="New Filter",
+            filter_query="done = false",
+            description="Desc",
+            is_favorite=True,
+            sort_by=["created"],
+            order_by=["desc"],
+        )
+        assert f.id == 2
+        assert f.filters.filter == "done = false"
+        assert f.filters.sort_by == ["created"]
+
+    @pytest.mark.asyncio
+    async def test_update_filter(
+        self, mock_client_ctx: AsyncMock
+    ) -> None:
+        """``update_filter`` merges overrides and returns the updated filter."""
+        mock_data = {
+            "id": 2,
+            "title": "Updated Title",
+            "filters": {"filter": "done = false"},
+        }
+        mock_client_ctx.update_filter.return_value = (
+            SavedFilter.model_validate(mock_data)
+        )
+
+        f = await update_filter(filter_id=2, title="Updated Title")
+
+        mock_client_ctx.update_filter.assert_called_once_with(
+            filter_id=2,
+            title="Updated Title",
+            filter_query=None,
+            description=None,
+            is_favorite=None,
+            sort_by=None,
+            order_by=None,
+        )
+        assert f.title == "Updated Title"
+
+    @pytest.mark.asyncio
+    async def test_delete_filter(
+        self, mock_client_ctx: AsyncMock
+    ) -> None:
+        """``delete_filter`` deletes the filter and returns confirmation."""
+        result = await delete_filter(filter_id=2)
+
+        mock_client_ctx.delete_filter.assert_called_once_with(2)
+        assert "Saved filter '2' successfully deleted." in result
+
+
 

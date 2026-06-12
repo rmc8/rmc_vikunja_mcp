@@ -14,7 +14,7 @@ from typing import Any, Self
 
 import httpx
 
-from vikunja_mcp.models import Comment, Label, Project, Task, User
+from vikunja_mcp.models import Bucket, Comment, Label, Project, SavedFilter, Task, User
 
 
 class VikunjaClient:
@@ -504,4 +504,207 @@ class VikunjaClient:
             "DELETE",
             f"tasks/{task_id}/relations/{relation_kind}/{other_task_id}",
         )
+
+    # -- Bucket endpoints ------------------------------------------------
+
+    async def list_buckets(self, project_id: int, view_id: int) -> list[Bucket]:
+        """List all Kanban buckets within a specific project view.
+
+        Args:
+            project_id: Vikunja project ID.
+            view_id: Vikunja project view ID.
+        """
+        data = await self._request(
+            "GET", f"projects/{project_id}/views/{view_id}/buckets"
+        )
+        return [Bucket.model_validate(item) for item in data]
+
+    async def create_bucket(
+        self,
+        project_id: int,
+        view_id: int,
+        title: str,
+        limit: int | None = None,
+        position: float | None = None,
+    ) -> Bucket:
+        """Create a new Kanban bucket in a project view.
+
+        Args:
+            project_id: Parent project ID.
+            view_id: Parent project view ID.
+            title: Title of the bucket.
+            limit: Optional Work In Progress (WIP) limit.
+            position: Optional position of the bucket.
+        """
+        body: dict[str, Any] = {"title": title}
+        if limit is not None:
+            body["limit"] = limit
+        if position is not None:
+            body["position"] = position
+        data = await self._request(
+            "PUT", f"projects/{project_id}/views/{view_id}/buckets", json=body
+        )
+        return Bucket.model_validate(data)
+
+    async def update_bucket(
+        self,
+        project_id: int,
+        view_id: int,
+        bucket_id: int,
+        title: str | None = None,
+        limit: int | None = None,
+    ) -> Bucket:
+        """Update an existing Kanban bucket.
+
+        Args:
+            project_id: Parent project ID.
+            view_id: Parent project view ID.
+            bucket_id: ID of the bucket to update.
+            title: Optional new title.
+            limit: Optional new WIP limit.
+        """
+        body: dict[str, Any] = {}
+        if title is not None:
+            body["title"] = title
+        if limit is not None:
+            body["limit"] = limit
+        data = await self._request(
+            "POST",
+            f"projects/{project_id}/views/{view_id}/buckets/{bucket_id}",
+            json=body,
+        )
+        return Bucket.model_validate(data)
+
+    async def delete_bucket(
+        self, project_id: int, view_id: int, bucket_id: int
+    ) -> None:
+        """Delete a Kanban bucket.
+
+        Args:
+            project_id: Parent project ID.
+            view_id: Parent project view ID.
+            bucket_id: ID of the bucket to delete.
+        """
+        await self._request(
+            "DELETE",
+            f"projects/{project_id}/views/{view_id}/buckets/{bucket_id}",
+        )
+
+    # -- Filter endpoints ------------------------------------------------
+
+    async def list_filters(self) -> list[SavedFilter]:
+        """List all saved filters."""
+        data = await self._request("GET", "filters")
+        return [SavedFilter.model_validate(item) for item in data]
+
+    async def get_filter(self, filter_id: int) -> SavedFilter:
+        """Fetch a single saved filter by its ID.
+
+        Args:
+            filter_id: Saved filter ID.
+        """
+        data = await self._request("GET", f"filters/{filter_id}")
+        return SavedFilter.model_validate(data)
+
+    async def create_filter(
+        self,
+        title: str,
+        filter_query: str,
+        description: str | None = None,
+        is_favorite: bool | None = None,
+        sort_by: list[str] | None = None,
+        order_by: list[str] | None = None,
+    ) -> SavedFilter:
+        """Create a new saved filter.
+
+        Args:
+            title: Title of the saved filter.
+            filter_query: The filter query string.
+            description: Optional description.
+            is_favorite: Optional favorite flag.
+            sort_by: Optional fields to sort by.
+            order_by: Optional sort order (asc/desc).
+        """
+        body: dict[str, Any] = {
+            "title": title,
+            "filters": {
+                "filter": filter_query,
+            },
+        }
+        if description is not None:
+            body["description"] = description
+        if is_favorite is not None:
+            body["is_favorite"] = is_favorite
+        if sort_by is not None:
+            body["filters"]["sort_by"] = sort_by
+        if order_by is not None:
+            body["filters"]["order_by"] = order_by
+
+        data = await self._request("PUT", "filters", json=body)
+        return SavedFilter.model_validate(data)
+
+    async def update_filter(
+        self,
+        filter_id: int,
+        title: str | None = None,
+        filter_query: str | None = None,
+        description: str | None = None,
+        is_favorite: bool | None = None,
+        sort_by: list[str] | None = None,
+        order_by: list[str] | None = None,
+    ) -> SavedFilter:
+        """Update an existing saved filter.
+
+        Args:
+            filter_id: ID of the filter to update.
+            title: Optional new title.
+            filter_query: Optional new filter query.
+            description: Optional new description.
+            is_favorite: Optional new favorite flag.
+            sort_by: Optional new fields to sort by.
+            order_by: Optional new sort order (asc/desc).
+        """
+        current = await self.get_filter(filter_id)
+
+        body: dict[str, Any] = {
+            "title": title if title is not None else current.title,
+            "description": (
+                description
+                if description is not None
+                else current.description
+            ),
+            "is_favorite": (
+                is_favorite
+                if is_favorite is not None
+                else current.is_favorite
+            ),
+            "filters": {
+                "filter": (
+                    filter_query
+                    if filter_query is not None
+                    else current.filters.filter
+                ),
+            },
+        }
+
+        merged_sort_by = sort_by if sort_by is not None else current.filters.sort_by
+        if merged_sort_by is not None:
+            body["filters"]["sort_by"] = merged_sort_by
+
+        merged_order_by = order_by if order_by is not None else current.filters.order_by
+        if merged_order_by is not None:
+            body["filters"]["order_by"] = merged_order_by
+
+        data = await self._request("POST", f"filters/{filter_id}", json=body)
+        return SavedFilter.model_validate(data)
+
+    async def delete_filter(self, filter_id: int) -> None:
+        """Permanently delete a saved filter.
+
+        Args:
+            filter_id: Saved filter ID.
+        """
+        await self._request("DELETE", f"filters/{filter_id}")
+
+
 
