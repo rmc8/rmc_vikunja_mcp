@@ -249,16 +249,54 @@ async def list_labels() -> list[Label]:
 
 @mcp.tool()
 async def create_label(
-    title: str, color: str | None = None
+    title: str, hex_color: str | None = None
 ) -> Label:
     """Create a new label.
 
     Args:
         title: The label name.
-        color: Optional HEX colour string (e.g. '#ff0000').
+        hex_color: Optional HEX colour string without '#' (e.g. 'ff0000').
     """
     async with get_client() as client:
-        return await client.create_label(title, color)
+        return await client.create_label(title, hex_color)
+
+
+@mcp.tool()
+async def update_label(
+    label_id: int,
+    title: str | None = None,
+    description: str | None = None,
+    hex_color: str | None = None,
+) -> Label:
+    """Update an existing label's name, description, or colour.
+
+    Only the fields you provide will be changed; all others are preserved.
+
+    Args:
+        label_id: The ID of the label to update.
+        title: New label name (omit to keep current).
+        description: New description (omit to keep current).
+        hex_color: New HEX colour without '#' (e.g. 'ff0000'; omit to keep current).
+    """
+    async with get_client() as client:
+        return await client.update_label(
+            label_id=label_id,
+            title=title,
+            description=description,
+            hex_color=hex_color,
+        )
+
+
+@mcp.tool()
+async def delete_label(label_id: int) -> str:
+    """Permanently delete a label.
+
+    Args:
+        label_id: The ID of the label to delete.
+    """
+    async with get_client() as client:
+        await client.delete_label(label_id)
+        return f"Label '{label_id}' successfully deleted."
 
 
 @mcp.tool()

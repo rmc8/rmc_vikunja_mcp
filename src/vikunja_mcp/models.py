@@ -79,6 +79,10 @@ class Task(BaseModel):
     priority: int | None = Field(
         default=None, description="Priority level (higher = more urgent)."
     )
+    labels: list["Label"] = Field(
+        default_factory=list,
+        description="Labels currently attached to this task.",
+    )
     created: str | None = Field(
         default=None, description="ISO-8601 creation timestamp."
     )
@@ -100,8 +104,9 @@ class Label(BaseModel):
     description: str | None = Field(
         default=None, description="Optional label description."
     )
-    color: str | None = Field(
-        default=None, description="HEX colour string, e.g. '#ff0000'."
+    hex_color: str | None = Field(
+        default=None, description="HEX colour string, e.g. 'ff0000' (no #).",
+        alias="hex_color",
     )
     created: str | None = Field(
         default=None, description="ISO-8601 creation timestamp."

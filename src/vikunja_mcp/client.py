@@ -16,8 +16,7 @@ import httpx
 
 from vikunja_mcp.models import Comment, Label, Project, Task, User
 
-# Fields that the API returns but must NOT be sent back on writes.
-_READ_ONLY_FIELDS: frozenset[str] = frozenset({"created", "updated"})
+
 
 
 class VikunjaClient:
@@ -151,7 +150,7 @@ class VikunjaClient:
         body: dict[str, str] = {"title": title}
         if description is not None:
             body["description"] = description
-        data = await self._request("POST", "projects", json=body)
+        data = await self._request("PUT", "projects", json=body)
         return Project.model_validate(data)
 
     async def get_project(self, project_id: int) -> Project:
@@ -240,7 +239,7 @@ class VikunjaClient:
         if priority is not None:
             body["priority"] = priority
         data = await self._request(
-            "POST", f"projects/{project_id}/tasks", json=body
+            "PUT", f"projects/{project_id}/tasks", json=body
         )
         return Task.model_validate(data)
 
@@ -254,12 +253,16 @@ class VikunjaClient:
         due_date: str | None = None,
         priority: int | None = None,
     ) -> Task:
-        """Update an existing task using a Read-Modify-Write pattern.
+        """Update an existing task using a safe Read-Modify-Write pattern.
 
-        The Vikunja ``POST /tasks/{id}`` endpoint resets any field that is
-        absent from the request body.  To avoid data loss we first GET the
-        current state, merge in the caller-supplied changes, strip
-        read-only timestamps, and then POST the result.
+        The Vikunja ``POST /tasks/{id}`` endpoint resets any field absent
+        from the request body.  To avoid data loss we first GET the current
+        state, extract only the scalar fields Vikunja accepts on write,
+        merge in caller-supplied overrides, and then POST the result.
+
+        Using an explicit whitelist (rather than a full model dump) prevents
+        accidentally sending read-only or nested fields (labels, assignees, …)
+        that the API would reject or silently corrupt.
 
         Setting *project_id* to a different value effectively **moves**
         the task to another project.
@@ -268,31 +271,41 @@ class VikunjaClient:
             task_id:     ID of the task to update.
             title:       New title (``None`` = keep current).
             description: New description.
-            done:        New completion status.
+            done:        New completion status (``False`` is valid and applied).
             project_id:  New parent project (moves the task).
             due_date:    New due date in ISO-8601 format.
             priority:    New priority level.
         """
-        # 1. Read the current task state.
-        current_task = await self.get_task(task_id)
-        body = current_task.model_dump(by_alias=True)
+        # 1. Read current state.
+        current = await self.get_task(task_id)
 
-        # 2. Merge caller-supplied overrides.
-        updates: dict[str, Any] = {
-            "title": title,
-            "description": description,
-            "done": done,
-            "project_id": project_id,
-            "due_date": due_date,
-            "priority": priority,
+        # 2. Build body from writable scalar fields only (whitelist).
+        #    This avoids sending labels/assignees/reactions that the API
+        #    would reject or use to overwrite existing associations.
+        body: dict[str, Any] = {
+            "title": current.title,
+            "description": current.description,
+            "done": current.done,
+            "project_id": current.project_id,
+            "due_date": current.due_date,
+            "priority": current.priority,
         }
-        for key, value in updates.items():
-            if value is not None:
-                body[key] = value
 
-        # 3. Strip read-only fields that must not be sent back.
-        for field in _READ_ONLY_FIELDS:
-            body.pop(field, None)
+        # 3. Merge caller-supplied overrides.
+        #    Note: use explicit sentinel checks so that falsy values like
+        #    done=False or priority=0 are still applied.
+        if title is not None:
+            body["title"] = title
+        if description is not None:
+            body["description"] = description
+        if done is not None:          # False must be applied
+            body["done"] = done
+        if project_id is not None:
+            body["project_id"] = project_id
+        if due_date is not None:
+            body["due_date"] = due_date
+        if priority is not None:
+            body["priority"] = priority
 
         data = await self._request("POST", f"tasks/{task_id}", json=body)
         return Task.model_validate(data)
@@ -313,19 +326,65 @@ class VikunjaClient:
         return [Label.model_validate(item) for item in data]
 
     async def create_label(
-        self, title: str, color: str | None = None
+        self, title: str, hex_color: str | None = None
     ) -> Label:
         """Create a new label.
 
         Args:
-            title: Label name.
-            color: Optional HEX colour string (e.g. ``'#ff0000'``).
+            title:     Label name.
+            hex_color: Optional HEX colour string without '#' (e.g. ``'ff0000'``).
         """
         body: dict[str, str] = {"title": title}
-        if color is not None:
-            body["color"] = color
-        data = await self._request("POST", "labels", json=body)
+        if hex_color is not None:
+            body["hex_color"] = hex_color
+        data = await self._request("PUT", "labels", json=body)
         return Label.model_validate(data)
+
+    async def update_label(
+        self,
+        label_id: int,
+        title: str | None = None,
+        description: str | None = None,
+        hex_color: str | None = None,
+    ) -> Label:
+        """Update an existing label (Read-Modify-Write).
+
+        Fetches the current label state first, then merges in the
+        caller-supplied changes before POSTing, so unspecified fields
+        are preserved.
+
+        Args:
+            label_id:    ID of the label to update.
+            title:       New label name (``None`` = keep current).
+            description: New description.
+            hex_color:   New HEX colour without '#' (e.g. ``'ff0000'``).
+        """
+        # 1. Read current state.
+        current_data = await self._request("GET", f"labels/{label_id}")
+        current = Label.model_validate(current_data)
+
+        # 2. Build body, preserving existing values for unspecified fields.
+        body: dict[str, Any] = {
+            "title": title if title is not None else current.title,
+            "description": (
+                description if description is not None else current.description
+            ),
+            "hex_color": (
+                hex_color if hex_color is not None else current.hex_color
+            ),
+        }
+
+        data = await self._request("POST", f"labels/{label_id}", json=body)
+        return Label.model_validate(data)
+
+    async def delete_label(self, label_id: int) -> None:
+        """Permanently delete a label.
+
+        Args:
+            label_id: ID of the label to delete.
+        """
+        await self._request("DELETE", f"labels/{label_id}")
+
 
     async def add_label_to_task(
         self, task_id: int, label_id: int
@@ -409,6 +468,6 @@ class VikunjaClient:
         """
         body = {"comment": comment}
         data = await self._request(
-            "POST", f"tasks/{task_id}/comments", json=body
+            "PUT", f"tasks/{task_id}/comments", json=body
         )
         return Comment.model_validate(data)
